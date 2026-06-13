@@ -1,0 +1,29 @@
+# Reproducible dev/runtime environment for eHT-PCR.
+#   conda env create -f environment.yml   &&   conda activate ehtpcr
+#
+# Binary tools and heavy bio libraries come from conda (conda-forge + bioconda);
+# the ehtpcr package itself is installed editable via the pip section.
+# bwa is PINNED — alignment output is version-sensitive (reproducibility).
+name: ehtpcr
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  # --- external binaries ---
+  - bwa=0.7.18          # specificity engine + target_fasta locator (bwa, default)
+  - samtools=1.21
+  - blast=2.15.0        # target_fasta locators: blastn / tblastn (optional)
+  - miniprot=0.13       # target_fasta locator: miniprot, protein->genome (optional)
+  # --- python libs (via conda to avoid ABI mismatch) ---
+  - pyfaidx>=0.7
+  - gffutils>=0.12
+  - mappy>=2.24          # target_fasta locator: minimap2, spliced transcript->genome
+  - biopython>=1.80      # alternative Tm models (NN tables, Wallace, GC)
+  - pydantic>=2
+  - pyyaml>=6
+  - typer>=0.12
+  - pip
+  - pip:
+      - -e .
+      - primer3-py>=2.0   # tm.model: primer3

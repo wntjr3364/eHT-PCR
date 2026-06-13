@@ -1,0 +1,52 @@
+# Large reference data — never committed (see README for expected layout)
+db/
+*.fasta
+*.fa
+# the bundled out-of-the-box example IS committed
+!examples/*.fa
+!examples/*.fasta
+
+# Sequence index artifacts — unambiguous binary suffixes are safe to ignore globally
+# (bwa, blast, samtools faidx)
+*.fai
+*.amb
+*.ann
+*.bwt
+*.pac
+*.sa
+*.nin
+*.nhr
+*.nsq
+# jar FastaIndex (.idx/.seq) and gffutils SQLite (.db) are NOT globally ignored —
+# the patterns are too generic and would swallow legitimate files. The real
+# artifacts live under db/ (ignored above) and the caches below.
+
+# Caches (bwa index cache, gffutils db cache)
+.cache/
+.ehtpcr_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Run outputs / temp
+result/
+.tmp/
+*.tmp
+
+# OS / editor
+.DS_Store
+*.swp

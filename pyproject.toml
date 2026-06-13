@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ehtpcr"
+dynamic = ["version"]                    # single source: src/ehtpcr/__init__.py
+description = "General-purpose in-silico PCR: design unique primer pairs against any reference"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "wntjr3364", email = "wntjr3364@gmail.com" }]
+keywords = ["bioinformatics", "PCR", "primer-design", "in-silico-PCR", "bwa"]
+
+# Python deps. External *binaries* (bwa required; blast/miniprot optional) come
+# from conda/your PATH — see README. biopython/primer3-py power the alternative
+# Tm models and are bundled so every design.tm.model works out of the box.
+dependencies = [
+    "pyfaidx>=0.7",
+    "gffutils>=0.12",     # target.mode == locus
+    "mappy>=2.24",        # target.locator == minimap2 (spliced transcript -> genome)
+    "biopython>=1.80",    # Tm models: NN tables + Wallace/GC
+    "primer3-py>=2.0",    # Tm model: primer3
+    "pydantic>=2",
+    "pyyaml>=6",
+    "typer>=0.12",
+]
+
+[tool.hatch.version]
+path = "src/ehtpcr/__init__.py"
+
+[project.scripts]
+ehtpcr = "ehtpcr.cli:main"
+
+[tool.hatch.build.targets.wheel]
+# src-layout: ship only the package (config/docs/examples stay out of the wheel).
+packages = ["src/ehtpcr"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/ehtpcr", "config", "docs", "examples", "environment.yml", "README.md", "README.ko.md", "LICENSE", "pyproject.toml"]
+# db/result are large/generated run outputs; index/aligner scratch is gitignored
+# (so it never enters a git-built sdist) — exclude the generated dirs explicitly too.
+exclude = [
+    "db", "result",
+    "**/*.fai", "**/*.amb", "**/*.ann", "**/*.bwt", "**/*.pac", "**/*.sa",
+]

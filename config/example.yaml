@@ -1,0 +1,84 @@
+# Example eHT-PCR run configuration. Works out of the box:
+#     ehtpcr run --config config/example.yaml
+# (points at the bundled examples/mini.fa). Swap reference/specificity.reference
+# to your own genome/transcriptome to do real work.
+#
+# Precedence: pydantic defaults < this file < environment (EHTPCR_*) < explicit
+# CLI flags. An UNSET CLI flag (None) never clobbers a value set here.
+version: 1                       # config schema version (currently always 1)
+
+reference:
+  fasta: examples/mini.fa        # design sequence space (your genome/transcriptome)
+  gff: null                      # GFF3 annotation; required only for target.mode == locus
+  gff_db_dir: null               # where to cache the gffutils SQLite DB; null => shared cache root
+
+target:
+  # What to design primers for — pick the mode that matches the input you have:
+  #   name        : transcriptome/FASTA; substring-match the header -> the WHOLE matched
+  #                 entry is the target (no GFF needed; pulls every isoform).
+  #   region      : you know the coordinates on a contig (1-based, inclusive).
+  #   locus       : genome + GFF; look up a gene ID's feature and extract its sub-region
+  #                 (needs reference.gff). 'name' needs no GFF; 'locus' does.
+  #   target_fasta: you only have the sequence -> locate it in the reference by alignment.
+  mode: name                     # name | region | locus | target_fasta
+  name: [gene]                   # mode: name -> header substring(s) (legacy --contain); repeatable
+  # region: "geneX:100-300:+"    # mode: region -> 1-based inclusive; strand (:+/:-) optional
+  # locus: [myGene]              # mode: locus -> gene ID(s); needs reference.gff
+  # query_fasta: queries.fa      # mode: target_fasta -> FASTA of query sequence(s) to locate
+  # locator: auto                #   how to align the query (mode: target_fasta):
+                                 #   auto    : DNA -> blastn, protein -> tblastn (default)
+                                 #   bwa     : DNA query, near-identical
+                                 #   blastn  : DNA query, sensitive + paralog-safe (BLAST+)
+                                 #   minimap2: spliced transcript -> genome (intron-aware)
+                                 #   tblastn : protein -> genome, paralog-safe (BLAST+)
+                                 #   miniprot: protein -> genome, splice-aware (paralog-blind)
+  # min_identity: 0.90           #   min alignment identity to accept a locus (0-1)
+  # min_coverage: 0.90           #   min query coverage to accept a locus (0-1); fail loud on >1 match
+  flank: { left: 0, right: 0 }   # extra bases each side of the target for the design template
+                                 #   (strand-aware); on-target is still judged on the un-flanked target
+
+design:
+  primer_len: { min: 18, max: 24 }          # primer length range (nt)
+  gc: { min: 0.30, max: 0.70 }              # primer GC fraction range (0-1)
+  tm: { min: 57, max: 62, model: legacy }   # primer melting-temp range (°C) + model:
+                                            #   legacy(Breslauer, default) | breslauer |
+                                            #   sugimoto | santalucia | santalucia2004 |
+                                            #   wallace | gc | primer3
+  gc_clamp: 2                               # required G/C bases at the 3' end (0 = off)
+  product_size: { min: 150, max: 250 }      # amplicon length range (bp)
+  pair:
+    tm_diff: { min: 0.0, max: 1.0 }         # allowed Tm difference between the F and R primer (°C)
+    gc_diff: { min: 0.0, max: 1.0 }         # allowed GC-fraction difference between F and R
+  allow_degenerate: false                   # must be false — IUPAC-degenerate primers not yet supported
+  softmask_policy: allow                    # 'allow' only (lowercase soft-mask treated normally);
+                                            #   'reject' / 'lowercase_penalty' are deferred
+
+specificity:
+  enabled: true                  # false => design-only (skip mapping); CLI: --no-spec/--spec
+  reference:
+    fasta: null                  # null => use the design reference; set to a SEPARATE
+                                 #   (e.g. curated) reference to check uniqueness against
+    index_dir: null              # where to keep THIS reference's bwa index; null => shared
+                                 #   cache root ($EHTPCR_CACHE_DIR / XDG_CACHE_HOME / ~/.cache)
+  engine: bwa_aln                # bwa_aln (pure Python, default) | (future) blast | thermo
+  keep: unique                   # which pairs to keep: all (every pair) | unique (single
+                                 #   on-target amplicon) | nomatch (legacy: pairs with no amplicon)
+  params:
+    bwa_aln:
+      max_mismatch: 0            # bwa -n: mismatches allowed when finding off-targets (example: 0 = exact)
+      max_product_size: 3000     # max amplicon span (bp) counted as a real product
+      drop_n_rich_windows: true  # jar-faithful: drop a hit whose ref window has >= threshold N's (D6)
+      n_window_threshold: 5      # the N count that triggers the drop above
+      max_amplicons_per_pair: 100000   # cap to avoid amplicon explosion on repetitive refs (0 = no cap; not 1)
+      overrides: {}              # per-target max_mismatch override, e.g. { geneX: 1 }
+
+runtime:
+  threads: 8                     # threads per bwa call
+  jobs: 1                        # targets processed in parallel (raise to speed up many targets)
+  out_dir: result/               # output dir (candidates.tsv, amplicons.tsv, manifest.json, run.yaml)
+  log_level: INFO                # DEBUG | INFO | WARNING | ERROR
+  max_pairs_per_target: 1000000  # cap on candidate pairs per target (guards an O(n^2) pairing blow-up)
+  fail_on_overflow: true         # error if a target exceeds max_pairs_per_target (false => warn + truncate)
+  fail_on_no_targets: true       # error if 0 targets resolve (catches name typos);
+                                 #   false => warn + write empty output (batch-tolerant)
+  keep_temp: false               # keep bwa temp files for debugging
